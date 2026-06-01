@@ -16,7 +16,7 @@ typedef struct {
     ngx_flag_t     enable;
     ngx_str_t      secret;
     ngx_str_t      header_name;
-} ngx_http_proxy_auth_internal_srv_conf_t;
+} ngx_http_proxy_auth_internal_loc_conf_t;
 
 
 static ngx_int_t ngx_http_proxy_auth_internal_add_variables(ngx_conf_t *cf);
@@ -26,8 +26,8 @@ static ngx_int_t ngx_http_proxy_auth_internal_build_fingerprint(
     ngx_http_request_t *r, ngx_str_t *fingerprint);
 static ngx_str_t ngx_http_proxy_auth_internal_compute_md5_hex(
     ngx_http_request_t *r, const u_char *data, size_t len);
-static void *ngx_http_proxy_auth_internal_create_srv_conf(ngx_conf_t *cf);
-static char *ngx_http_proxy_auth_internal_merge_srv_conf(ngx_conf_t *cf,
+static void *ngx_http_proxy_auth_internal_create_loc_conf(ngx_conf_t *cf);
+static char *ngx_http_proxy_auth_internal_merge_loc_conf(ngx_conf_t *cf,
     void *parent, void *child);
 static ngx_int_t ngx_http_proxy_auth_internal_init(ngx_conf_t *cf);
 
@@ -42,24 +42,24 @@ static ngx_int_t ngx_http_proxy_auth_internal_set_header(ngx_http_request_t *r,
 static ngx_command_t  ngx_http_proxy_auth_internal_commands[] = {
 
     { ngx_string("proxy_auth_internal"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
-      offsetof(ngx_http_proxy_auth_internal_srv_conf_t, enable),
+      offsetof(ngx_http_proxy_auth_internal_loc_conf_t, enable),
       NULL },
 
     { ngx_string("proxy_auth_internal_secret"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
-      offsetof(ngx_http_proxy_auth_internal_srv_conf_t, secret),
+      offsetof(ngx_http_proxy_auth_internal_loc_conf_t, secret),
       NULL },
 
     { ngx_string("proxy_auth_internal_header"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
-      offsetof(ngx_http_proxy_auth_internal_srv_conf_t, header_name),
+      offsetof(ngx_http_proxy_auth_internal_loc_conf_t, header_name),
       NULL },
 
       ngx_null_command
@@ -73,11 +73,11 @@ static ngx_http_module_t  ngx_http_proxy_auth_internal_module_ctx = {
     NULL,                                          /* create main config */
     NULL,                                          /* init main config */
 
-    ngx_http_proxy_auth_internal_create_srv_conf,  /* create server config */
-    ngx_http_proxy_auth_internal_merge_srv_conf,   /* merge server config */
+    NULL,                                          /* create server config */
+    NULL                                           /* merge server config */
 
-    NULL,                                          /* create loc config */
-    NULL                                           /* merge loc config */
+    ngx_http_proxy_auth_internal_create_loc_conf,  /* create loc config */
+    ngx_http_proxy_auth_internal_merge_loc_conf,   /* merge loc config */
 };
 
 
@@ -158,26 +158,25 @@ ngx_http_proxy_auth_internal_build_fingerprint(ngx_http_request_t *r,
     u_char                                     *fingerprint_data;
     u_char                                      timestamp_hex[9];
     ngx_str_t                                   md5;
-    ngx_http_proxy_auth_internal_srv_conf_t    *conf;
+    ngx_http_proxy_auth_internal_loc_conf_t    *plcf;
 
-    conf = ngx_http_get_module_srv_conf(r,
-                                        ngx_http_proxy_auth_internal_module);
+    plcf = ngx_http_get_module_loc_conf(r, ngx_http_proxy_auth_internal_module);
 
-    if (conf->secret.len == 0) {
+    if (plcf->secret.len == 0) {
         return NGX_DECLINED;
     }
 
     timestamp = (uint32_t) ngx_time();
     ngx_sprintf(timestamp_hex, "%08xi", timestamp);
 
-    data_len = conf->secret.len + 8;
+    data_len = plcf->secret.len + 8;
     fingerprint_data = ngx_pnalloc(r->pool, data_len);
     if (fingerprint_data == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_memcpy(fingerprint_data, conf->secret.data, conf->secret.len);
-    ngx_memcpy(fingerprint_data + conf->secret.len, timestamp_hex, 8);
+    ngx_memcpy(fingerprint_data, plcf->secret.data, plcf->secret.len);
+    ngx_memcpy(fingerprint_data + plcf->secret.len, timestamp_hex, 8);
 
     md5 = ngx_http_proxy_auth_internal_compute_md5_hex(r, fingerprint_data,
                                                        data_len);
@@ -231,16 +230,15 @@ ngx_http_proxy_auth_internal_request_filter(ngx_http_request_t *r,
 {
     ngx_int_t                                  rc;
     ngx_str_t                                  fingerprint;
-    ngx_http_proxy_auth_internal_srv_conf_t   *conf;
+    ngx_http_proxy_auth_internal_loc_conf_t   *plcf;
 
     if (ctx->headers == NULL) {
         return NGX_DECLINED;
     }
 
-    conf = ngx_http_get_module_srv_conf(r,
-                                        ngx_http_proxy_auth_internal_module);
+    plcf = ngx_http_get_module_loc_conf(r, ngx_http_proxy_auth_internal_module);
 
-    if (!conf->enable) {
+    if (!plcf->enable) {
         return NGX_DECLINED;
     }
 
@@ -254,7 +252,7 @@ ngx_http_proxy_auth_internal_request_filter(ngx_http_request_t *r,
     }
 
     rc = ngx_http_proxy_auth_internal_set_header(r, ctx->headers,
-                                                 &conf->header_name,
+                                                 &plcf->header_name,
                                                  &fingerprint);
     if (rc != NGX_OK) {
         return NGX_ERROR;
@@ -349,12 +347,12 @@ ngx_http_proxy_auth_internal_set_header(ngx_http_request_t *r,
 
 
 static void *
-ngx_http_proxy_auth_internal_create_srv_conf(ngx_conf_t *cf)
+ngx_http_proxy_auth_internal_create_loc_conf(ngx_conf_t *cf)
 {
-    ngx_http_proxy_auth_internal_srv_conf_t  *conf;
+    ngx_http_proxy_auth_internal_loc_conf_t  *conf;
 
     conf = ngx_pcalloc(cf->pool,
-                       sizeof(ngx_http_proxy_auth_internal_srv_conf_t));
+                       sizeof(ngx_http_proxy_auth_internal_loc_conf_t));
     if (conf == NULL) {
         return NULL;
     }
@@ -366,11 +364,11 @@ ngx_http_proxy_auth_internal_create_srv_conf(ngx_conf_t *cf)
 
 
 static char *
-ngx_http_proxy_auth_internal_merge_srv_conf(ngx_conf_t *cf, void *parent,
+ngx_http_proxy_auth_internal_merge_loc_conf(ngx_conf_t *cf, void *parent,
     void *child)
 {
-    ngx_http_proxy_auth_internal_srv_conf_t  *prev = parent;
-    ngx_http_proxy_auth_internal_srv_conf_t  *conf = child;
+    ngx_http_proxy_auth_internal_loc_conf_t  *prev = parent;
+    ngx_http_proxy_auth_internal_loc_conf_t  *conf = child;
 
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_str_value(conf->secret, prev->secret, "");
