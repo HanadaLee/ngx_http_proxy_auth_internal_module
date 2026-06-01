@@ -74,10 +74,10 @@ static ngx_http_module_t  ngx_http_proxy_auth_internal_module_ctx = {
     NULL,                                          /* init main config */
 
     NULL,                                          /* create server config */
-    NULL                                           /* merge server config */
+    NULL,                                          /* merge server config */
 
     ngx_http_proxy_auth_internal_create_loc_conf,  /* create loc config */
-    ngx_http_proxy_auth_internal_merge_loc_conf,   /* merge loc config */
+    ngx_http_proxy_auth_internal_merge_loc_conf    /* merge loc config */
 };
 
 
