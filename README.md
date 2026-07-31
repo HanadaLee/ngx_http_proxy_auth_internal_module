@@ -42,7 +42,7 @@ before this module.
 
 **Default:** `proxy_auth_internal off;`
 
-**Context:** `http`, `server`
+**Context:** `http`, `server`, `location`, `when`
 
 Enables or disables direct proxy request header injection when proxy filter is
 available.
@@ -53,7 +53,7 @@ available.
 
 **Default:** `-`
 
-**Context:** `http`, `server`
+**Context:** `http`, `server`, `location`, `when`
 
 Configures the secret used to generate fingerprints.
 
@@ -63,7 +63,7 @@ Configures the secret used to generate fingerprints.
 
 **Default:** `proxy_auth_internal_header X-Fingerprint;`
 
-**Context:** `http`, `server`
+**Context:** `http`, `server`, `location`, `when`
 
 Sets the upstream request header used for generated fingerprints.
 
