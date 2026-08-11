@@ -194,43 +194,32 @@ ngx_http_proxy_auth_internal_build_fingerprint(ngx_http_request_t *r,
     u_char                                     *fingerprint_data;
     u_char                                      timestamp_hex[9];
     ngx_str_t                                   md5;
-    ngx_http_proxy_auth_internal_loc_conf_t    *plcf;
-#if (NGX_CONDITION)
     ngx_str_t                                  *secret;
-#endif
+    ngx_http_proxy_auth_internal_loc_conf_t    *plcf;
 
     plcf = ngx_http_get_module_loc_conf(r, ngx_http_proxy_auth_internal_module);
 
 #if (NGX_CONDITION)
     secret = ngx_http_get_conditional_str_value(r, plcf->secret);
+#else
+    secret = &plcf->secret;
+#endif
 
     if (secret == NULL || secret->len == 0) {
-#else
-    if (plcf->secret.len == 0) {
-#endif
         return NGX_DECLINED;
     }
 
     timestamp = (uint32_t) ngx_time();
     ngx_sprintf(timestamp_hex, "%08xi", timestamp);
 
-#if (NGX_CONDITION)
     data_len = secret->len + 8;
-#else
-    data_len = plcf->secret.len + 8;
-#endif
     fingerprint_data = ngx_pnalloc(r->pool, data_len);
     if (fingerprint_data == NULL) {
         return NGX_ERROR;
     }
 
-#if (NGX_CONDITION)
     ngx_memcpy(fingerprint_data, secret->data, secret->len);
     ngx_memcpy(fingerprint_data + secret->len, timestamp_hex, 8);
-#else
-    ngx_memcpy(fingerprint_data, plcf->secret.data, plcf->secret.len);
-    ngx_memcpy(fingerprint_data + plcf->secret.len, timestamp_hex, 8);
-#endif
 
     md5 = ngx_http_proxy_auth_internal_compute_md5_hex(r, fingerprint_data,
                                                        data_len);
