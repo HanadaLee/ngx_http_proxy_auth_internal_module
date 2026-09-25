@@ -7,8 +7,8 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 #include <ngx_md5.h>
-#if (NGX_CONDITION)
-#include <ngx_http_condition_module.h>
+#if (NGX_EXPR)
+#include <ngx_http_expr_module.h>
 #endif
 #if (NGX_HTTP_PROXY_FILTER)
 #include <ngx_http_proxy_filter_module.h>
@@ -16,7 +16,7 @@
 
 
 typedef struct {
-#if (NGX_CONDITION)
+#if (NGX_EXPR)
     ngx_array_t    *enable;
     ngx_array_t    *secret;
     ngx_array_t    *header_name;
@@ -52,12 +52,12 @@ static ngx_command_t  ngx_http_proxy_auth_internal_commands[] = {
 
     { ngx_string("proxy_auth_internal"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF
-#if (NGX_CONDITION)
+#if (NGX_EXPR)
                         |NGX_HTTP_MAIN_WHEN_CONF|NGX_HTTP_SRV_WHEN_CONF
                         |NGX_HTTP_LOC_WHEN_CONF
 #endif
                         |NGX_CONF_FLAG,
-#if (NGX_CONDITION)
+#if (NGX_EXPR)
       ngx_conf_set_conditional_flag_slot,
 #else
       ngx_conf_set_flag_slot,
@@ -68,12 +68,12 @@ static ngx_command_t  ngx_http_proxy_auth_internal_commands[] = {
 
     { ngx_string("proxy_auth_internal_secret"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF
-#if (NGX_CONDITION)
+#if (NGX_EXPR)
                         |NGX_HTTP_MAIN_WHEN_CONF|NGX_HTTP_SRV_WHEN_CONF
                         |NGX_HTTP_LOC_WHEN_CONF
 #endif
                         |NGX_CONF_TAKE1,
-#if (NGX_CONDITION)
+#if (NGX_EXPR)
       ngx_conf_set_conditional_str_slot,
 #else
       ngx_conf_set_str_slot,
@@ -84,12 +84,12 @@ static ngx_command_t  ngx_http_proxy_auth_internal_commands[] = {
 
     { ngx_string("proxy_auth_internal_header"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF
-#if (NGX_CONDITION)
+#if (NGX_EXPR)
                         |NGX_HTTP_MAIN_WHEN_CONF|NGX_HTTP_SRV_WHEN_CONF
                         |NGX_HTTP_LOC_WHEN_CONF
 #endif
                         |NGX_CONF_TAKE1,
-#if (NGX_CONDITION)
+#if (NGX_EXPR)
       ngx_conf_set_conditional_str_slot,
 #else
       ngx_conf_set_str_slot,
@@ -199,8 +199,8 @@ ngx_http_proxy_auth_internal_build_fingerprint(ngx_http_request_t *r,
 
     plcf = ngx_http_get_module_loc_conf(r, ngx_http_proxy_auth_internal_module);
 
-#if (NGX_CONDITION)
-    secret = ngx_http_get_conditional_str_value(r, plcf->secret);
+#if (NGX_EXPR)
+    secret = ngx_http_get_expr_str_value(r, plcf->secret);
 #else
     secret = &plcf->secret;
 #endif
@@ -274,7 +274,7 @@ ngx_http_proxy_auth_internal_request_filter(ngx_http_request_t *r,
     ngx_int_t                                  rc;
     ngx_str_t                                  fingerprint;
     ngx_http_proxy_auth_internal_loc_conf_t   *plcf;
-#if (NGX_CONDITION)
+#if (NGX_EXPR)
     ngx_str_t                                 *header_name;
 #endif
 
@@ -284,8 +284,8 @@ ngx_http_proxy_auth_internal_request_filter(ngx_http_request_t *r,
 
     plcf = ngx_http_get_module_loc_conf(r, ngx_http_proxy_auth_internal_module);
 
-#if (NGX_CONDITION)
-    if (!ngx_http_get_conditional_flag_value(r, plcf->enable)) {
+#if (NGX_EXPR)
+    if (!ngx_http_get_expr_flag_value(r, plcf->enable)) {
 #else
     if (!plcf->enable) {
 #endif
@@ -301,8 +301,8 @@ ngx_http_proxy_auth_internal_request_filter(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-#if (NGX_CONDITION)
-    header_name = ngx_http_get_conditional_str_value(r, plcf->header_name);
+#if (NGX_EXPR)
+    header_name = ngx_http_get_expr_str_value(r, plcf->header_name);
     if (header_name == NULL) {
         return NGX_ERROR;
     }
@@ -417,7 +417,7 @@ ngx_http_proxy_auth_internal_create_loc_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-#if !(NGX_CONDITION)
+#if !(NGX_EXPR)
     conf->enable = NGX_CONF_UNSET;
 #endif
 
@@ -431,28 +431,26 @@ ngx_http_proxy_auth_internal_merge_loc_conf(ngx_conf_t *cf, void *parent,
 {
     ngx_http_proxy_auth_internal_loc_conf_t  *prev = parent;
     ngx_http_proxy_auth_internal_loc_conf_t  *conf = child;
-#if (NGX_CONDITION)
+#if (NGX_EXPR)
     ngx_str_t  empty = ngx_null_string;
     ngx_str_t  header_name = ngx_string("X-Fingerprint");
 #endif
 
-#if (NGX_CONDITION)
-    if (ngx_conf_merge_conditional_flag_value(cf, &conf->enable,
-                                              prev->enable, 0)
+#if (NGX_EXPR)
+    if (ngx_conf_merge_expr_flag_value(cf, &conf->enable, prev->enable, 0)
         != NGX_OK)
     {
         return NGX_CONF_ERROR;
     }
 
-    if (ngx_conf_merge_conditional_str_value(cf, &conf->secret,
-                                             prev->secret, empty)
+    if (ngx_conf_merge_expr_str_value(cf, &conf->secret, prev->secret, empty)
         != NGX_OK)
     {
         return NGX_CONF_ERROR;
     }
 
-    if (ngx_conf_merge_conditional_str_value(cf, &conf->header_name,
-                                             prev->header_name, header_name)
+    if (ngx_conf_merge_expr_str_value(cf, &conf->header_name,
+                                      prev->header_name, header_name)
         != NGX_OK)
     {
         return NGX_CONF_ERROR;
