@@ -27,6 +27,8 @@ http {
 
 ## Installation
 
+
+This module must be built statically with `--add-module`.
 ```sh
 ./configure --add-module=/path/to/ngx_http_proxy_auth_internal_module
 ```
