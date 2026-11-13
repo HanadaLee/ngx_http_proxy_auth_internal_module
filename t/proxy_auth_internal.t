@@ -19,7 +19,7 @@ use Test::Nginx qw/ :DEFAULT http_content /;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http proxy rewrite ngx_expr_module
+my $t = Test::Nginx->new()->has(qw/http proxy rewrite
 	ngx_http_proxy_auth_internal_module/);
 
 plan(skip_all => 'proxy filter build required')
@@ -27,7 +27,8 @@ plan(skip_all => 'proxy filter build required')
 
 $t->plan(11);
 
-$t->write_file_expand('nginx.conf', <<'EOF');
+my $expr = $t->has_module('ngx_expr_module');
+my $config = <<'EOF';
 
 %%TEST_GLOBALS%%
 
@@ -128,6 +129,11 @@ http {
 
 EOF
 
+unless ($expr) {
+	$config =~ s/^        expr [^;]+;\n//mg;
+	$config =~ s/^            when \w+ \{\n.*?^            \}\n//msg;
+}
+$t->write_file_expand('nginx.conf', $config);
 $t->run();
 
 ###############################################################################
@@ -142,17 +148,19 @@ is(field($custom, 0), 'stale', 'custom header leaves the default header alone');
 fingerprint_ok(field($custom, 1), 'base',
 	'custom header receives the generated fingerprint');
 
-fingerprint_ok(field(auth_body('/conditional?mode=special'), 0), 'selected',
-	'matching condition selects its secret');
-fingerprint_ok(field(auth_body('/conditional?mode=other'), 0), 'fallback',
-	'condition miss selects the fallback secret');
-fingerprint_ok(field(auth_body('/order?mode=special'), 0), 'first',
-	'first unconditional secret wins over a later condition');
-
-fingerprint_ok(field(auth_body('/conditional-enable?mode=special'), 0), 'base',
-	'matching condition enables direct injection');
-is(auth_body('/conditional-enable?mode=other'), 'stale|',
-	'condition miss selects the disabled fallback');
+SKIP: {
+	skip 'requires ngx_expr_module', 5 unless $expr;
+	fingerprint_ok(field(auth_body('/conditional?mode=special'), 0), 'selected',
+		'matching condition selects its secret');
+	fingerprint_ok(field(auth_body('/conditional?mode=other'), 0), 'fallback',
+		'condition miss selects the fallback secret');
+	fingerprint_ok(field(auth_body('/order?mode=special'), 0), 'first',
+		'first unconditional secret wins over a later condition');
+	fingerprint_ok(field(auth_body('/conditional-enable?mode=special'), 0), 'base',
+		'matching condition enables direct injection');
+	is(auth_body('/conditional-enable?mode=other'), 'stale|',
+		'condition miss selects the disabled fallback');
+}
 
 fingerprint_ok(field(auth_body('/inherit/child'), 1), 'inherited',
 	'secret and custom header inherit into a nested location');
